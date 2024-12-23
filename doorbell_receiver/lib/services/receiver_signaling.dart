@@ -2,16 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class ReceiverSignalingService {
+  Function? onIncomingCall;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   RTCPeerConnection? peerConnection;
   MediaStream? localStream;
-  Function(MediaStream)? onAddRemoteStream;
+  final RTCVideoRenderer remoteRenderer;
+  
+  ReceiverSignalingService(this.remoteRenderer);
 
   Map<String, dynamic> configuration = {
     "iceServers": [
-      {"url": "stun:stun.l.google.com:19302"},
+      {"urls": "stun:stun.l.google.com:19302"},
       {
-        "url": "turn:numb.viagenie.ca",
+        "urls": "turn:numb.viagenie.ca",
         "username": "webrtc@live.com",
         "credential": "muazkh"
       }
@@ -21,40 +24,66 @@ class ReceiverSignalingService {
   Future<void> initialize() async {
     peerConnection = await createPeerConnection(configuration);
 
-    // Handle incoming video streams
-    peerConnection?.onTrack = (RTCTrackEvent event) {
-      if (event.streams.isNotEmpty) {
-        onAddRemoteStream?.call(event.streams[0]);
+    // Get local media stream
+    localStream = await navigator.mediaDevices.getUserMedia({
+      'audio': true,
+      'video': {
+        'mandatory': {
+          'minWidth': '640',
+          'minHeight': '480',
+          'minFrameRate': '30',
+        },
+        'facingMode': 'user',
+        'optional': [],
       }
-    };
+    });
 
-    // Set up local media stream
-    localStream = await navigator.mediaDevices
-        .getUserMedia({'audio': true, 'video': true});
-
-    // Add local stream tracks to peer connection
     localStream?.getTracks().forEach((track) {
       peerConnection?.addTrack(track, localStream!);
     });
 
-    // Listen for ICE candidates
+    peerConnection?.onTrack = (RTCTrackEvent event) {
+      // ignore: unnecessary_null_comparison
+      if (event.streams[0] != null) {
+        remoteRenderer.srcObject = event.streams[0];
+      }
+    };
+
     peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
       _addCandidate(candidate);
     };
 
-    // Listen for incoming calls
+    // Debug logs
+    peerConnection?.onIceConnectionState = (RTCIceConnectionState state) {
+      print('ICE Connection State: $state');
+    };
+
+    // Listen for calls
     _listenForCalls();
   }
 
   void _listenForCalls() {
-    _firestore
-        .collection('calls')
-        .doc('currentCall')
-        .snapshots()
-        .listen((snapshot) {
+    _firestore.collection('calls').doc('currentCall').snapshots().listen((snapshot) {
       if (snapshot.exists && snapshot.data()?['type'] == 'offer') {
+        onIncomingCall?.call();
         handleOffer(snapshot.data()!);
       }
+    });
+
+    // Listen for candidates
+    _firestore.collection('calls').doc('currentCall').collection('candidates').snapshots().listen((snapshot) {
+      snapshot.docChanges.forEach((change) {
+        if (change.type == DocumentChangeType.added) {
+          Map<String, dynamic> data = change.doc.data() as Map<String, dynamic>;
+          peerConnection?.addCandidate(
+            RTCIceCandidate(
+              data['candidate']['candidate'],
+              data['candidate']['sdpMid'],
+              data['candidate']['sdpMLineIndex'],
+            ),
+          );
+        }
+      });
     });
   }
 
@@ -76,18 +105,19 @@ class ReceiverSignalingService {
   }
 
   Future<void> _addCandidate(RTCIceCandidate candidate) async {
-    await _firestore
-        .collection('calls')
-        .doc('currentCall')
-        .collection('candidates')
-        .add({
+    await _firestore.collection('calls').doc('currentCall').collection('candidates').add({
       'candidate': candidate.toMap(),
       'timestamp': FieldValue.serverTimestamp(),
     });
   }
 
+  Future<void> endCall() async {
+    localStream?.getTracks().forEach((track) => track.stop());
+    await localStream?.dispose();
+    await peerConnection?.close();
+  }
+
   void dispose() {
-    localStream?.dispose();
-    peerConnection?.dispose();
+    endCall();
   }
 }

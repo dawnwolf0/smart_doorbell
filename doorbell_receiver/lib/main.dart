@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'services/receiver_signaling.dart';
 import 'screens/video_call_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(ReceiverApp());
+  runApp(const ReceiverApp());
 }
 
 class ReceiverApp extends StatelessWidget {
+  const ReceiverApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -19,47 +21,45 @@ class ReceiverApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ReceiverHomeScreen(),
+      home: const ReceiverHomeScreen(),
     );
   }
 }
 
 class ReceiverHomeScreen extends StatefulWidget {
+  const ReceiverHomeScreen({super.key});
+
   @override
-  _ReceiverHomeScreenState createState() => _ReceiverHomeScreenState();
+  State<ReceiverHomeScreen> createState() => ReceiverHomeScreenState();
 }
 
-class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
-  final ReceiverSignalingService _signaling = ReceiverSignalingService();
+class ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool _isInitialized = false;
-  bool _isInCall = false;
+  late ReceiverSignalingService _signaling;
 
   @override
   void initState() {
     super.initState();
-    _initialize();
+    _initializeApp();
   }
 
-  Future<void> _initialize() async {
+  Future<void> _requestPermissions() async {
+    await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+  }
+
+  Future<void> _initializeApp() async {
+    await _requestPermissions();
     await _remoteRenderer.initialize();
+    _signaling = ReceiverSignalingService(_remoteRenderer);
     await _signaling.initialize();
-
-    _signaling.onAddRemoteStream = ((stream) {
-      _remoteRenderer.srcObject = stream;
-      setState(() {});
-    });
-
-    // Listen for incoming calls
-    FirebaseFirestore.instance
-        .collection('calls')
-        .doc('currentCall')
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && snapshot.data()?['type'] == 'offer') {
-        _handleIncomingCall();
-      }
-    });
+    
+    _signaling.onIncomingCall = () {
+      _handleIncomingCall();
+    };
 
     setState(() {
       _isInitialized = true;
@@ -67,49 +67,44 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   }
 
   void _handleIncomingCall() {
-    if (!_isInCall) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Incoming Call'),
-            content: Text('Someone is at the door!'),
-            actions: [
-              TextButton(
-                child: Text('Decline'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-              TextButton(
-                child: Text('Accept'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _acceptCall();
-                },
-              ),
-            ],
-          );
-        },
-      );
-    }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Incoming Call'),
+          content: const Text('Someone is at the door!'),
+          actions: [
+            TextButton(
+              child: const Text('Decline'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _signaling.endCall();
+              },
+            ),
+            TextButton(
+              child: const Text('Accept'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _acceptCall();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _acceptCall() {
-    setState(() {
-      _isInCall = true;
-    });
-    
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VideoCallScreen(),
+        builder: (context) => VideoCallScreen(
+          remoteRenderer: _remoteRenderer,
+        ),
       ),
     ).then((_) {
-      setState(() {
-        _isInCall = false;
-      });
+      _signaling.endCall();
     });
   }
 
@@ -117,14 +112,14 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Doorbell Receiver'),
+        title: const Text('Doorbell Receiver'),
       ),
       body: Center(
         child: !_isInitialized
-            ? CircularProgressIndicator()
+            ? const CircularProgressIndicator()
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+                children: const [
                   Icon(
                     Icons.doorbell_outlined,
                     size: 100,
@@ -135,13 +130,6 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
                     'Waiting for doorbell...',
                     style: TextStyle(fontSize: 20),
                   ),
-                  if (_isInCall)
-                    Expanded(
-                      child: RTCVideoView(
-                        _remoteRenderer,
-                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                      ),
-                    ),
                 ],
               ),
       ),
@@ -150,6 +138,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
 
   @override
   void dispose() {
+    _signaling.dispose();
     _remoteRenderer.dispose();
     super.dispose();
   }
