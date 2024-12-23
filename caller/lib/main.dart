@@ -5,7 +5,7 @@ import 'services/signaling_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(DoorbellApp());
+  runApp(const DoorbellApp());
 }
 
 class DoorbellApp extends StatelessWidget {
@@ -20,13 +20,11 @@ class DoorbellApp extends StatelessWidget {
 }
 
 class DoorbellScreen extends StatefulWidget {
-  const DoorbellScreen({super.key});
-
   @override
-  _DoorbellScreenState createState() => _DoorbellScreenState();
+  State<DoorbellScreen> createState() => DoorbellScreenState();
 }
 
-class _DoorbellScreenState extends State<DoorbellScreen> {
+class DoorbellScreenState extends State<DoorbellScreen> {
   final SignalingService _signaling = SignalingService();
   bool _isInitialized = false;
   bool _isInCall = false;
@@ -54,23 +52,23 @@ class _DoorbellScreenState extends State<DoorbellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Doorbell')),
+      appBar: AppBar(title: Text('Doorbell')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (!_isInitialized)
-              const CircularProgressIndicator()
+              CircularProgressIndicator()
             else if (!_isInCall)
               ElevatedButton(
                 onPressed: _handleButtonPress,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                ),
                 child: Text('Ring Doorbell'),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                ),
               )
             else
-              const Text('Call in progress...'),
+              Text('Call in progress...'),
           ],
         ),
       ),

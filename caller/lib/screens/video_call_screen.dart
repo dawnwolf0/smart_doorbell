@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class VideoCallScreen extends StatefulWidget {
-  const VideoCallScreen({super.key});
-
   @override
-  _VideoCallScreenState createState() => _VideoCallScreenState();
+  State<VideoCallScreen> createState() => VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen> {
+class VideoCallScreenState extends State<VideoCallScreen> {
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool _isInitialized = false;
 

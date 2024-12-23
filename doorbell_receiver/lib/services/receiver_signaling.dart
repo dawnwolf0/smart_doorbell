@@ -21,18 +21,37 @@ class ReceiverSignalingService {
   Future<void> initialize() async {
     peerConnection = await createPeerConnection(configuration);
 
-    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
-      _addCandidate(candidate);
-    };
-
+    // Handle incoming video streams
     peerConnection?.onTrack = (RTCTrackEvent event) {
       if (event.streams.isNotEmpty) {
         onAddRemoteStream?.call(event.streams[0]);
       }
     };
 
+    // Set up local media stream
+    localStream = await navigator.mediaDevices
+        .getUserMedia({'audio': true, 'video': true});
+
+    // Add local stream tracks to peer connection
+    localStream?.getTracks().forEach((track) {
+      peerConnection?.addTrack(track, localStream!);
+    });
+
+    // Listen for ICE candidates
+    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+      _addCandidate(candidate);
+    };
+
     // Listen for incoming calls
-    _firestore.collection('calls').doc('currentCall').snapshots().listen((snapshot) {
+    _listenForCalls();
+  }
+
+  void _listenForCalls() {
+    _firestore
+        .collection('calls')
+        .doc('currentCall')
+        .snapshots()
+        .listen((snapshot) {
       if (snapshot.exists && snapshot.data()?['type'] == 'offer') {
         handleOffer(snapshot.data()!);
       }
@@ -40,13 +59,13 @@ class ReceiverSignalingService {
   }
 
   Future<void> handleOffer(Map<String, dynamic> offer) async {
-    RTCSessionDescription description = RTCSessionDescription(
-      offer['offer']['sdp'],
-      offer['offer']['type'],
+    await peerConnection?.setRemoteDescription(
+      RTCSessionDescription(
+        offer['offer']['sdp'],
+        offer['offer']['type'],
+      ),
     );
-    await peerConnection?.setRemoteDescription(description);
 
-    // Create answer
     RTCSessionDescription answer = await peerConnection!.createAnswer();
     await peerConnection!.setLocalDescription(answer);
 
@@ -57,7 +76,11 @@ class ReceiverSignalingService {
   }
 
   Future<void> _addCandidate(RTCIceCandidate candidate) async {
-    await _firestore.collection('calls').doc('currentCall').collection('candidates').add({
+    await _firestore
+        .collection('calls')
+        .doc('currentCall')
+        .collection('candidates')
+        .add({
       'candidate': candidate.toMap(),
       'timestamp': FieldValue.serverTimestamp(),
     });
