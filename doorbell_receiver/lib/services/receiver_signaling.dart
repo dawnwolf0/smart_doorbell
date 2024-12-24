@@ -7,7 +7,7 @@ class ReceiverSignalingService {
   RTCPeerConnection? peerConnection;
   MediaStream? localStream;
   final RTCVideoRenderer remoteRenderer;
-  
+
   ReceiverSignalingService(this.remoteRenderer);
 
   Map<String, dynamic> configuration = {
@@ -43,7 +43,6 @@ class ReceiverSignalingService {
     });
 
     peerConnection?.onTrack = (RTCTrackEvent event) {
-      // ignore: unnecessary_null_comparison
       if (event.streams[0] != null) {
         remoteRenderer.srcObject = event.streams[0];
       }
@@ -53,12 +52,10 @@ class ReceiverSignalingService {
       _addCandidate(candidate);
     };
 
-    // Debug logs
     peerConnection?.onIceConnectionState = (RTCIceConnectionState state) {
       print('ICE Connection State: $state');
     };
 
-    // Listen for calls
     _listenForCalls();
   }
 
@@ -70,7 +67,6 @@ class ReceiverSignalingService {
       }
     });
 
-    // Listen for candidates
     _firestore.collection('calls').doc('currentCall').collection('candidates').snapshots().listen((snapshot) {
       snapshot.docChanges.forEach((change) {
         if (change.type == DocumentChangeType.added) {
