@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1011962471566",
+    "project_id": "smartdoorbell-synectiks",
+    "storage_bucket": "smartdoorbell-synectiks.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011962471566:android:b4210d502902c5e72f15df",
+        "android_client_info": {
+          "package_name": "com.example.caller"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZPbPct13yWaPinowP-gQ7OlPM_ejwCIk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1011962471566:android:051cbd038645e0382f15df",
+        "android_client_info": {
+          "package_name": "com.example.caller_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZPbPct13yWaPinowP-gQ7OlPM_ejwCIk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

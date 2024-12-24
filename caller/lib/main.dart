@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'services/signaling_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,12 +15,17 @@ class DoorbellApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: DoorbellScreen(),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const DoorbellScreen(),
     );
   }
 }
 
 class DoorbellScreen extends StatefulWidget {
+  const DoorbellScreen({super.key});
+
   @override
   State<DoorbellScreen> createState() => DoorbellScreenState();
 }
@@ -35,7 +41,15 @@ class DoorbellScreenState extends State<DoorbellScreen> {
     _initializeSignaling();
   }
 
+  Future<void> _requestPermissions() async {
+    await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+  }
+
   Future<void> _initializeSignaling() async {
+    await _requestPermissions();
     await _signaling.initialize();
     setState(() {
       _isInitialized = true;
@@ -52,23 +66,45 @@ class DoorbellScreenState extends State<DoorbellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Doorbell')),
+      appBar: AppBar(
+        title: const Text('Doorbell'),
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (!_isInitialized)
-              CircularProgressIndicator()
+              const CircularProgressIndicator()
             else if (!_isInCall)
               ElevatedButton(
                 onPressed: _handleButtonPress,
-                child: Text('Ring Doorbell'),
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
                 ),
+                child: const Text('Ring Doorbell'),
               )
             else
-              Text('Call in progress...'),
+              Column(
+                children: [
+                  const Text('Call in progress...'),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      _signaling.endCall();
+                      setState(() {
+                        _isInCall = false;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 30, vertical: 15),
+                    ),
+                    child: const Text('End Call'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

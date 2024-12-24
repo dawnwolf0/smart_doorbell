@@ -2,65 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class VideoCallScreen extends StatefulWidget {
+  final RTCVideoRenderer remoteRenderer;
+
+  const VideoCallScreen({Key? key, required this.remoteRenderer}) : super(key: key);
+
   @override
-  _VideoCallScreenState createState() => _VideoCallScreenState();
+  State<VideoCallScreen> createState() => VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen> {
-  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
-  bool _isInitialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeRenderer();
-  }
-
-  Future<void> _initializeRenderer() async {
-    await _remoteRenderer.initialize();
-    setState(() {
-      _isInitialized = true;
-    });
-  }
+class VideoCallScreenState extends State<VideoCallScreen> {
+  bool _isMuted = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Incoming Call')),
-      body: _isInitialized
-          ? Column(
-              children: [
-                Expanded(
-                  child: RTCVideoView(
-                    _remoteRenderer,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            RTCVideoView(
+              widget.remoteRenderer,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            ),
+            Positioned(
+              bottom: 30,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  FloatingActionButton(
+                    onPressed: () {
+                      setState(() {
+                        _isMuted = !_isMuted;
+                      });
+                    },
+                    backgroundColor: _isMuted ? Colors.red : Colors.white,
+                    child: Icon(
+                      _isMuted ? Icons.mic_off : Icons.mic,
+                      color: _isMuted ? Colors.white : Colors.black,
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      FloatingActionButton(
-                        onPressed: () {
-                          // End call
-                          Navigator.pop(context);
-                        },
-                        backgroundColor: Colors.red,
-                        child: Icon(Icons.call_end),
-                      ),
-                    ],
+                  FloatingActionButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    backgroundColor: Colors.red,
+                    child: const Icon(Icons.call_end),
                   ),
-                ),
-              ],
-            )
-          : Center(child: CircularProgressIndicator()),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-  }
-
-  @override
-  void dispose() {
-    _remoteRenderer.dispose();
-    super.dispose();
   }
 }
